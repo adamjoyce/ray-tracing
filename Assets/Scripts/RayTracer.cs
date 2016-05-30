@@ -58,14 +58,14 @@ public class RayTracer : MonoBehaviour {
 
                 positionColour += HandleLights(objectInfo, hitPosition, hit.normal, ray.direction);
 
-                //
+                // Solve reflection pixel colour by casting a new reflection ray.
                 if (objectInfo.reflectiveCoefficient > 0f) {
                     float reflet = 2.0f * Vector3.Dot(ray.direction, hit.normal);
                     Ray newRay = new Ray(hitPosition, ray.direction - reflet * hit.normal);
                     positionColour += objectInfo.reflectiveCoefficient * DetermineColour(newRay, positionColour, ++currentIteration);
                 }
 
-                //
+                // Solve transparent pixels by casting a ray from the hit point past the transparent object.
                 if (objectInfo.transparentCoefficient > 0f) {
                     Ray newRay = new Ray(hit.point - hit.normal * 0.0001f, ray.direction);
                     positionColour += objectInfo.transparentCoefficient * DetermineColour(newRay, positionColour, ++currentIteration);
@@ -75,13 +75,12 @@ public class RayTracer : MonoBehaviour {
         return positionColour;
     }
 
-    //
+    // Handles the light reflections in the scene.
     private Color HandleLights(ObjectRayTracingInfo objectInfo, Vector3 rayHitPosition, Vector3 hitSurfaceNormal, Vector3 rayDirection) {
         Color lightColour = RenderSettings.ambientLight;
 
         for (int i = 0; i < lights.Length; i++) {
             if (lights[i].enabled) {
-                // Additively ray trace the light.
                 lightColour += LightTrace(objectInfo, lights[i], rayHitPosition, hitSurfaceNormal, rayDirection);
             }
         }
@@ -89,7 +88,7 @@ public class RayTracer : MonoBehaviour {
         return lightColour;
     }
 
-    //
+    // Handles Lambertian contribution to the lighting colour, as well as reflective contributions determined using Phong or Blinn-Phong methods.
     private Color LightTrace(ObjectRayTracingInfo objectInfo, Light light, Vector3 rayHitPosition, Vector3 hitSurfaceNormal, Vector3 rayDirection) {
         Vector3 lightDirection;
         float lightDistance, lightContribution, dotProduct;
@@ -142,7 +141,7 @@ public class RayTracer : MonoBehaviour {
         return Color.black;
     }
 
-    //
+    // Draws the GUI, in this case the main render texture.
     private void OnGUI() {
         GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), renderTexture);
     }
