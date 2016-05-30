@@ -54,13 +54,14 @@ public class RayTracer : MonoBehaviour {
                 }
 
                 ObjectRayTracingInfo objectInfo = hit.collider.gameObject.GetComponent<ObjectRayTracingInfo>();
-                // Possible issue here with hit.point.
-                positionColour += HandleLights(objectInfo, hit.point + hit.normal * 0.0001f, hit.normal, ray.direction);
+                Vector3 hitPosition = hit.point + hit.normal * 0.0001f;
+
+                positionColour += HandleLights(objectInfo, hitPosition, hit.normal, ray.direction);
 
                 //
                 if (objectInfo.reflectiveCoefficient > 0f) {
                     float reflet = 2.0f * Vector3.Dot(ray.direction, hit.normal);
-                    Ray newRay = new Ray(hit.point + hit.normal * 0.0001f, ray.direction - reflet * hit.normal);
+                    Ray newRay = new Ray(hitPosition, ray.direction - reflet * hit.normal);
                     positionColour += objectInfo.reflectiveCoefficient * DetermineColour(newRay, positionColour, ++currentIteration);
                 }
 
@@ -133,7 +134,7 @@ public class RayTracer : MonoBehaviour {
                         }
                     }
                 }
-            }
+            } //else if (light.type == )
 
             return light.color * light.intensity * lightContribution;
         }
