@@ -76,12 +76,12 @@ public class RayTracer : MonoBehaviour {
     }
 
     // Handles the light reflections in the scene.
-    private Color HandleLights(ObjectRayTracingInfo objectInfo, Vector3 rayHitPosition, Vector3 hitSurfaceNormal, Vector3 rayDirection) {
+    private Color HandleLights(ObjectRayTracingInfo objectInfo, Vector3 rayHitPosition, Vector3 surfaceNormal, Vector3 rayDirection) {
         Color lightColour = RenderSettings.ambientLight;
 
         for (int i = 0; i < lights.Length; i++) {
             if (lights[i].enabled) {
-                lightColour += LightTrace(objectInfo, lights[i], rayHitPosition, hitSurfaceNormal, rayDirection);
+                lightColour += LightTrace(objectInfo, lights[i], rayHitPosition, surfaceNormal, rayDirection);
             }
         }
 
@@ -98,7 +98,7 @@ public class RayTracer : MonoBehaviour {
             lightDirection = -light.transform.forward;
 
             // Determine the angle that the light reflects of the surface.
-            dotDirectionNormal = Vector3.Dot(rayDirection, surfaceNormal);
+            dotDirectionNormal = Vector3.Dot(lightDirection, surfaceNormal);
             if (dotDirectionNormal > 0) {
                 // Returns the colour black if the hit position is in shadow.
                 if (Physics.Raycast(rayHitPosition, lightDirection, maximumRaycastDistance)) {
@@ -113,7 +113,7 @@ public class RayTracer : MonoBehaviour {
         else if (light.type == LightType.Spot) {
             lightContribution = 0;
             lightDirection = (light.transform.position - rayHitPosition).normalized;
-            dotDirectionNormal = Vector3.Dot(rayDirection, surfaceNormal);
+            dotDirectionNormal = Vector3.Dot(lightDirection, surfaceNormal);
             lightDistance = Vector3.Distance(rayHitPosition, light.transform.position);
 
             // Ensure the light is within range of the object and the angle of incidence positive.
