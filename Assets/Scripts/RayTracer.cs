@@ -31,18 +31,19 @@ public class RayTracer : MonoBehaviour {
             for (int y = 0; y < renderTexture.height; y++) {
                 Vector3 rayPosition = new Vector3(x / resolution, y / resolution, 0);
                 Ray ray = GetComponent<Camera>().ScreenPointToRay(rayPosition);
-                renderTexture.SetPixel(x, y, TraceColour(ray, defaultColour, 0));
+                renderTexture.SetPixel(x, y, DetermineColour(ray, defaultColour, 0));
             }
         }
     }
 
-    //
-    private Color TraceColour(Ray ray, Color positionColour, int currentIteration) {
+    // Determines the overall colour of the pixel at the location of the ray collision.
+    private Color DetermineColour(Ray ray, Color positionColour, int currentIteration) {
         if (currentIteration < maximumIterations) {
             RaycastHit hit;
+
             // Check the ray intersects a collider.
             if (Physics.Raycast(ray, out hit, maximumRaycastDistance)) {
-                // Determine the basic colour of the pixel.
+                // Determine the basic material colour of the pixel.
                 Material objectMaterial = hit.collider.gameObject.GetComponent<Renderer>().material;
                 if (objectMaterial.mainTexture) {
                     Texture2D mainTexture = objectMaterial.mainTexture as Texture2D;
@@ -52,9 +53,82 @@ public class RayTracer : MonoBehaviour {
                 }
 
                 ObjectRayTracingInfo objectInfo = hit.collider.gameObject.GetComponent<ObjectRayTracingInfo>();
-                // Deal with light tracing i.e. reflective and transparent properties.
+                // Possible issue here with hit.point.
+                positionColour += HandleLights(objectInfo, hit.point, hit.normal, ray.direction);
             }
         }
         return positionColour;
+    }
+
+    //
+    private Color HandleLights(ObjectRayTracingInfo objectInfo, Vector3 rayHitPosition, Vector3 hitSurfaceNormal, Vector3 rayDirection) {
+        Color lightColour = RenderSettings.ambientLight;
+
+        for (int i = 0; i < lights.Length; i++) {
+            if (lights[i].enabled) {
+                // Additively ray trace the light.
+                // lightColour += ...
+            }
+        }
+
+        return lightColour;
+    }
+
+    //
+    private Color LightTrace(ObjectRayTracingInfo objectInfo, Light light, Vector3 rayHitPosition, Vector3 hitSurfaceNormal, Vector3 rayDirection) {
+        Vector3 lightDirection;
+        float lightDistance, lightContribution, dotProduct;
+
+        if (light.type == LightType.Directional) {
+            lightDirection = -light.transform.forward;
+            lightContribution = 0;
+
+            // Determine the angle that the light reflects of the surface.
+            dotProduct = Vector3.Dot(rayDirection, hitSurfaceNormal);
+            if (dotProduct > 0) {
+                // Is the object in shadow?
+                if (Physics.Raycast(rayHitPosition, lightDirection, maximumRaycastDistance)) {
+                    return Color.black;
+                }
+
+                //
+                if (objectInfo.lambertCoefficient > 0)
+                    lightContribution += objectInfo.lambertCoefficient * dotProduct;
+
+                if (objectInfo.reflectiveCoefficient > 0) {
+                    // Phong method of reflection.
+                    if (objectInfo.phongCoefficient > 0) {
+                        float reflet = 2.0f * Vector3.Dot(rayDirection, hitSurfaceNormal);
+                        Vector3 phongDirection = rayDirection - reflet * hitSurfaceNormal;
+                        float phongTerm = Max(Vector3.Dot(phongDirection, rayDirection), 0f);
+                        phongTerm = objectInfo.reflectiveCoefficient * Mathf.Pow(phongTerm, objectInfo.phongPower) * objectInfo.phongCoefficient;
+
+                        lightContribution += phongTerm;
+                    }
+
+                    // Blinn-Phong method of reflection.
+                    if (objectInfo.blinnPhongCoefficient > 0) {
+                        Vector3 blinnDirection = -light.transform.forward - rayDirection;
+                        float temp = Mathf.Sqrt(Vector3.Dot(blinnDirection, blinnDirection));
+                        if (temp > 0f) {
+                            blinnDirection = (1f / temp) * blinnDirection;
+                            float blinnTerm = Max(Vector3.Dot(blinnDirection, hitSurfaceNormal), 0f);
+                            blinnTerm = objectInfo.reflectiveCoefficient * Mathf.Pow(blinnTerm, objectInfo.blinnPhongPower) * objectInfo.blinnPhongCoefficient;
+
+                            lightContribution += blinnTerm;
+                        }
+                    }
+                }
+            }
+
+            return light.color * light.intensity * lightContribution;
+        }
+
+        return Color.black;
+    }
+    
+    // Returns the maximum of the two given values.
+    private float Max(float value1, float value2) {
+        return value1 > value2 ? value1 : value2;
     }
 }
