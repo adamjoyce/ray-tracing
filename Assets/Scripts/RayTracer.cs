@@ -34,6 +34,7 @@ public class RayTracer : MonoBehaviour {
                 renderTexture.SetPixel(x, y, DetermineColour(ray, defaultColour, 0));
             }
         }
+        renderTexture.Apply();
     }
 
     // Determines the overall colour of the pixel at the location of the ray collision.
@@ -54,7 +55,20 @@ public class RayTracer : MonoBehaviour {
 
                 ObjectRayTracingInfo objectInfo = hit.collider.gameObject.GetComponent<ObjectRayTracingInfo>();
                 // Possible issue here with hit.point.
-                positionColour += HandleLights(objectInfo, hit.point, hit.normal, ray.direction);
+                positionColour += HandleLights(objectInfo, hit.point + hit.normal * 0.0001f, hit.normal, ray.direction);
+
+                //
+                if (objectInfo.reflectiveCoefficient > 0f) {
+                    float reflet = 2.0f * Vector3.Dot(ray.direction, hit.normal);
+                    Ray newRay = new Ray(hit.point + hit.normal * 0.0001f, ray.direction - reflet * hit.normal);
+                    positionColour += objectInfo.reflectiveCoefficient * DetermineColour(newRay, positionColour, ++currentIteration);
+                }
+
+                //
+                if (objectInfo.transparentCoefficient > 0f) {
+                    Ray newRay = new Ray(hit.point - hit.normal * 0.0001f, ray.direction);
+                    positionColour += objectInfo.transparentCoefficient * DetermineColour(newRay, positionColour, ++currentIteration);
+                }
             }
         }
         return positionColour;
@@ -67,7 +81,7 @@ public class RayTracer : MonoBehaviour {
         for (int i = 0; i < lights.Length; i++) {
             if (lights[i].enabled) {
                 // Additively ray trace the light.
-                // lightColour += ...
+                lightColour += LightTrace(objectInfo, lights[i], rayHitPosition, hitSurfaceNormal, rayDirection);
             }
         }
 
@@ -125,6 +139,11 @@ public class RayTracer : MonoBehaviour {
         }
 
         return Color.black;
+    }
+
+    //
+    private void OnGUI() {
+        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), renderTexture);
     }
     
     // Returns the maximum of the two given values.
