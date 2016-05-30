@@ -89,51 +89,51 @@ public class RayTracer : MonoBehaviour {
     }
 
     // Handles Lambertian contribution to the lighting colour, as well as reflective contributions determined using Phong or Blinn-Phong methods.
-    private Color LightTrace(ObjectRayTracingInfo objectInfo, Light light, Vector3 rayHitPosition, Vector3 hitSurfaceNormal, Vector3 rayDirection) {
+    private Color LightTrace(ObjectRayTracingInfo objectInfo, Light light, Vector3 rayHitPosition, Vector3 surfaceNormal, Vector3 rayDirection) {
         Vector3 lightDirection;
-        float lightDistance, lightContribution, dotProduct;
+        float lightDistance, lightContribution, dotDirectionNormal;
 
         if (light.type == LightType.Directional) {
-            lightDirection = -light.transform.forward;
             lightContribution = 0;
+            lightDirection = -light.transform.forward;
 
             // Determine the angle that the light reflects of the surface.
-            dotProduct = Vector3.Dot(rayDirection, hitSurfaceNormal);
-            if (dotProduct > 0) {
-                // Is the object in shadow?
+            dotDirectionNormal = Vector3.Dot(rayDirection, surfaceNormal);
+            if (dotDirectionNormal > 0) {
+                // Returns the colour black if the hit position is in shadow.
                 if (Physics.Raycast(rayHitPosition, lightDirection, maximumRaycastDistance)) {
                     return Color.black;
                 }
 
-                //
-                if (objectInfo.lambertCoefficient > 0)
-                    lightContribution += objectInfo.lambertCoefficient * dotProduct;
+                lightContribution += CalculateLightContribution(objectInfo, dotDirectionNormal, rayDirection, surfaceNormal, light);
+            }
 
-                if (objectInfo.reflectiveCoefficient > 0) {
-                    // Phong method of reflection.
-                    if (objectInfo.phongCoefficient > 0) {
-                        float reflet = 2.0f * Vector3.Dot(rayDirection, hitSurfaceNormal);
-                        Vector3 phongDirection = rayDirection - reflet * hitSurfaceNormal;
-                        float phongTerm = Max(Vector3.Dot(phongDirection, rayDirection), 0f);
-                        phongTerm = objectInfo.reflectiveCoefficient * Mathf.Pow(phongTerm, objectInfo.phongPower) * objectInfo.phongCoefficient;
+            return light.color * light.intensity * lightContribution;
+        } 
+        else if (light.type == LightType.Spot) {
+            lightContribution = 0;
+            lightDirection = (light.transform.position - rayHitPosition).normalized;
+            dotDirectionNormal = Vector3.Dot(rayDirection, surfaceNormal);
+            lightDistance = Vector3.Distance(rayHitPosition, light.transform.position);
 
-                        lightContribution += phongTerm;
+            // Ensure the light is within range of the object and the angle of incidence positive.
+            if (lightDistance < light.range && dotDirectionNormal > 0f) {
+                float dotDirectionLight = Vector3.Dot(rayDirection, -light.transform.forward);
+
+                // Ensure the object being lit falls within the spot light's radius.
+                if (dotDirectionLight > (1 - light.spotAngle / 180f)) {
+                    // Returns the colour black if the hit position is in shadow.
+                    if (Physics.Raycast(rayHitPosition, lightDirection, maximumRaycastDistance)) {
+                        return Color.black;
                     }
 
-                    // Blinn-Phong method of reflection.
-                    if (objectInfo.blinnPhongCoefficient > 0) {
-                        Vector3 blinnDirection = -light.transform.forward - rayDirection;
-                        float temp = Mathf.Sqrt(Vector3.Dot(blinnDirection, blinnDirection));
-                        if (temp > 0f) {
-                            blinnDirection = (1f / temp) * blinnDirection;
-                            float blinnTerm = Max(Vector3.Dot(blinnDirection, hitSurfaceNormal), 0f);
-                            blinnTerm = objectInfo.reflectiveCoefficient * Mathf.Pow(blinnTerm, objectInfo.blinnPhongPower) * objectInfo.blinnPhongCoefficient;
-
-                            lightContribution += blinnTerm;
-                        }
-                    }
+                    lightContribution += CalculateLightContribution(objectInfo, dotDirectionNormal, rayDirection, surfaceNormal, light);
                 }
-            } //else if (light.type == )
+            }
+
+            if (lightContribution == 0) {
+                return Color.black;
+            }
 
             return light.color * light.intensity * lightContribution;
         }
@@ -141,13 +141,56 @@ public class RayTracer : MonoBehaviour {
         return Color.black;
     }
 
-    // Draws the GUI, in this case the main render texture.
-    private void OnGUI() {
-        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), renderTexture);
+    //
+    private float CalculateLightContribution(ObjectRayTracingInfo objectInfo, float dotDirectionNormal, Vector3 rayDirection, Vector3 surfaceNormal, Light light) {
+        float lightContribution = 0;
+
+        if (objectInfo.lambertCoefficient > 0) {
+            lightContribution += objectInfo.lambertCoefficient * dotDirectionNormal;
+        }
+
+        if (objectInfo.reflectiveCoefficient > 0) {
+            if (objectInfo.phongCoefficient > 0) {
+                lightContribution += Phong(objectInfo, rayDirection, surfaceNormal);
+            }
+
+            if (objectInfo.blinnPhongCoefficient > 0) {
+                lightContribution += BlinnPhong(objectInfo, light, rayDirection, surfaceNormal);
+            }
+        }
+
+        return lightContribution;
     }
-    
+
+    // Calculate the Phong reflection term.
+    private float Phong(ObjectRayTracingInfo objectInfo, Vector3 rayDirection, Vector3 hitSurfaceNormal) {
+        float reflet = 2.0f * Vector3.Dot(rayDirection, hitSurfaceNormal);
+        Vector3 phongDirection = rayDirection - reflet * hitSurfaceNormal;
+        float phongTerm = Max(Vector3.Dot(phongDirection, rayDirection), 0f);
+        phongTerm = objectInfo.reflectiveCoefficient * Mathf.Pow(phongTerm, objectInfo.phongPower) * objectInfo.phongCoefficient;
+        return phongTerm;
+    }
+
+    // Calculate the Blinn-Phong reflection term.
+    private float BlinnPhong(ObjectRayTracingInfo objectInfo, Light light, Vector3 rayDirection, Vector3 hitSurfaceNormal) {
+        Vector3 blinnDirection = -light.transform.forward - rayDirection;
+        float temp = Mathf.Sqrt(Vector3.Dot(blinnDirection, blinnDirection));
+        if (temp > 0f) {
+            blinnDirection = (1f / temp) * blinnDirection;
+            float blinnTerm = Max(Vector3.Dot(blinnDirection, hitSurfaceNormal), 0f);
+            blinnTerm = objectInfo.reflectiveCoefficient * Mathf.Pow(blinnTerm, objectInfo.blinnPhongPower) * objectInfo.blinnPhongCoefficient;
+            return blinnTerm;
+        }
+        return 0f;
+    }
+
     // Returns the maximum of the two given values.
     private float Max(float value1, float value2) {
         return value1 > value2 ? value1 : value2;
+    }
+
+    // Draws the GUI, in this case the main render texture.
+    private void OnGUI() {
+        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), renderTexture);
     }
 }
