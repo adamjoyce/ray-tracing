@@ -118,7 +118,7 @@ public class RayTracer : MonoBehaviour {
 
             // Ensure the light is within range of the object and the angle of incidence positive.
             if (lightDistance < light.range && dotDirectionNormal > 0f) {
-                float dotDirectionLight = Vector3.Dot(rayDirection, -light.transform.forward);
+                float dotDirectionLight = Vector3.Dot(lightDirection, -light.transform.forward);
 
                 // Ensure the object being lit falls within the spot light's radius.
                 if (dotDirectionLight > (1 - light.spotAngle / 180f)) {
