@@ -60,8 +60,8 @@ public class RayTracer : MonoBehaviour {
 
                 // Solve reflection pixel colour by casting a new reflection ray.
                 if (objectInfo.reflectiveCoefficient > 0f) {
-                    float reflet = 2.0f * Vector3.Dot(ray.direction, hit.normal);
-                    Ray newRay = new Ray(hitPosition, ray.direction - reflet * hit.normal);
+                    float reflect = 2.0f * Vector3.Dot(ray.direction, hit.normal);
+                    Ray newRay = new Ray(hitPosition, ray.direction - reflect * hit.normal);
                     positionColour += objectInfo.reflectiveCoefficient * DetermineColour(newRay, positionColour, ++currentIteration);
                 }
 
@@ -88,7 +88,7 @@ public class RayTracer : MonoBehaviour {
         return lightColour;
     }
 
-    // Handles Lambertian contribution to the lighting colour, as well as reflective contributions determined using Phong or Blinn-Phong methods.
+    // Determines the different lighting contributions on a pixel in the scene based on the type of light being processed.
     private Color LightTrace(ObjectRayTracingInfo objectInfo, Light light, Vector3 rayHitPosition, Vector3 surfaceNormal, Vector3 rayDirection) {
         Vector3 lightDirection;
         float lightDistance, lightContribution, dotDirectionNormal;
@@ -141,7 +141,7 @@ public class RayTracer : MonoBehaviour {
         return Color.black;
     }
 
-    //
+    // Calculate the light contribuation on a specific object hit point and thus pixel location in the scene.
     private float CalculateLightContribution(ObjectRayTracingInfo objectInfo, float dotDirectionNormal, Vector3 rayDirection, Vector3 surfaceNormal, Light light) {
         float lightContribution = 0;
 
@@ -164,8 +164,8 @@ public class RayTracer : MonoBehaviour {
 
     // Calculate the Phong reflection term.
     private float Phong(ObjectRayTracingInfo objectInfo, Vector3 rayDirection, Vector3 hitSurfaceNormal) {
-        float reflet = 2.0f * Vector3.Dot(rayDirection, hitSurfaceNormal);
-        Vector3 phongDirection = rayDirection - reflet * hitSurfaceNormal;
+        float reflect = 2.0f * Vector3.Dot(rayDirection, hitSurfaceNormal);
+        Vector3 phongDirection = rayDirection - reflect * hitSurfaceNormal;
         float phongTerm = Max(Vector3.Dot(phongDirection, rayDirection), 0f);
         phongTerm = objectInfo.reflectiveCoefficient * Mathf.Pow(phongTerm, objectInfo.phongPower) * objectInfo.phongCoefficient;
         return phongTerm;
